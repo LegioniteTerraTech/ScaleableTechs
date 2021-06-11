@@ -1,0 +1,22 @@
+THESE ARE BLOCK MODULES!!!
+
+            /*
+             * "ScaleableTechs.RescaleSystem.ModuleScaleWithSize": 
+             * {
+             *      "IsPipParticles": true,              // Is this a Pip Particles module?
+             *      "SavedScale": 1,                     // Set the value for fixed Pip Particles here
+             *      "IsStrongPipParticles": false,       // Does this override DynamicPipParticles?
+             *      "IsDynamicPipParticles": false,      // Do we enable sliders for this? - REQUIRES ModuleDynamicScaler to function!
+             *      "maxPermittedSliderScaling": 0.4,    // The maximum allowed scale on the slider for when IsDynamicPipParticles is enabled
+             *      "minPermittedSliderScaling": 2.5,    // The minimum allowed scale on the slider for when IsDynamicPipParticles is enabled
+             *      "MustBeAnchored": false,             // Does this only operate when anchored?
+             * }
+             */
+             
+             
+            /*
+             * "ScaleableTechs.RescaleSystem.ModuleScaleWithSize": 
+             * {
+             *     "KeepStatsRegardlessofScale": false, // Set this to "true" through your JSON to disable all block patches based on scale
+             * }
+             */
