@@ -1,0 +1,9 @@
+﻿{
+  "Id": "legionite.scaletechs.core",
+  "DisplayName": "Scaleable Techs",
+  "Author": "Legionite",
+  "Version": "0.1.0",
+  "Enable": true,
+  "AssemblyName": "ScaleableTechs.dll",
+  "EntryMethod": "ScaleableTechs.KickStart.Main"
+}
