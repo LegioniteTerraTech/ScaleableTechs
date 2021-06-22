@@ -806,7 +806,7 @@ namespace ScaleableTechs
                         thisInst.shieldCache = shld.m_Radius;
                         if (shld.m_Healing == false)
                             thisHasShield = true;
-                        Debug.Log("ScaleTechs: Saved " + shld.m_Radius + " => " + thisInst.shieldCache);
+                        //Debug.Log("ScaleTechs: Saved " + shld.m_Radius + " => " + thisInst.shieldCache);
                     }
                     catch
                     {
@@ -1097,6 +1097,9 @@ namespace ScaleableTechs
 
             private void OnSerialize(bool saving, TankPreset.BlockSpec blockSpec)
             {
+
+                if (KickStart.unInstallTrue)
+                    return;// no operations here for uninstall
                 if (IsDynamicPipParticles || gameObject.name == "_C_BLOCK:584870")
                 {   //only IF this is dynamic particles as the other WON'T Save!
                     if (saving)
@@ -1108,7 +1111,7 @@ namespace ScaleableTechs
                                 savedScale = TankBlock.transform.root.GetComponent<RescaleableTank>().DynamicScaleA
                             };
                             serialData.Store(blockSpec.saveState);
-                            Debug.Log("ScaleTechs: Saved " + SavedScale + " in gameObject " + gameObject.name);
+                            //Debug.Log("ScaleTechs: Saved " + SavedScale + " in gameObject " + gameObject.name);
                         }
                         else
                         {
@@ -1117,7 +1120,7 @@ namespace ScaleableTechs
                                 savedScale = TankBlock.transform.root.GetComponent<RescaleableTank>().DynamicScale
                             };
                             serialData.Store(blockSpec.saveState);
-                            Debug.Log("ScaleTechs: Saved " + SavedScale + " in gameObject " + gameObject.name);
+                            //Debug.Log("ScaleTechs: Saved " + SavedScale + " in gameObject " + gameObject.name);
                         }
                     }
                     else

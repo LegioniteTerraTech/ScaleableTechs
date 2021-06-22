@@ -33,6 +33,7 @@ namespace ScaleableTechs
                                                         //  WAIT i fixed it let's just make this the player tech only option
 
         public static bool RandomEnemyScales = true;   // Randomized Scale for each enemy?
+        public static bool unInstallTrue = false;   // Randomized Scale for each enemy?
 
         public static bool isBuffBlocksPresent = false;
 
@@ -45,6 +46,7 @@ namespace ScaleableTechs
         public static OptionToggle randomEnemyScale;
         public static OptionRange allTechsScale;
         public static OptionToggle noPreventLogsplosion;
+        public static OptionToggle unInstall;
 
 
         public static void Main()
@@ -82,6 +84,7 @@ namespace ScaleableTechs
             thisModConfig.BindConfig<KickStart>(null, "RandomEnemyScales");
             thisModConfig.BindConfig<KickStart>(null, "ResetPlayerScale");
             thisModConfig.BindConfig<KickStart>(null, "GlobalAimedScale");
+            thisModConfig.BindConfig<KickStart>(null, "unInstallTrue");
             _thisModConfig = thisModConfig;
 
 
@@ -100,6 +103,8 @@ namespace ScaleableTechs
 
             allTechsScale = new OptionRange("Global Tech Scale", TechScaleProperties, GlobalAimedScale, 0.5f, 2.0f, 0.1f);
             allTechsScale.onValueSaved.AddListener(() => { GlobalAimedScale = allTechsScale.SavedValue; });
+            unInstall = new OptionToggle("\n<b>Prepare for Uninstall</b>  \n(Toggle this OFF and Save your Techs & Worlds to keep!)", TechScaleProperties, unInstallTrue);
+            unInstall.onValueSaved.AddListener(() => { unInstallTrue = unInstall.SavedValue; });
         }
 
         public static bool LookForMod(string name)
