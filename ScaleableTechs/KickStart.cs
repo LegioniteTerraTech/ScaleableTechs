@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using UnityEngine;
-using Harmony;
+using HarmonyLib;
 using ModHelper.Config;
 using Nuterra.NativeOptions;
 
@@ -54,7 +54,7 @@ namespace ScaleableTechs
             //Where the fun begins
 
             //Initiate the madness
-            HarmonyInstance harmonyInstance = HarmonyInstance.Create("legionite.scaletechs.core");
+            Harmony harmonyInstance = new Harmony("legionite.scaletechs.core");
             try
             {
                 harmonyInstance.PatchAll(Assembly.GetExecutingAssembly());
