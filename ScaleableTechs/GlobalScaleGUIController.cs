@@ -61,6 +61,7 @@ namespace ScaleableTechs
             GUIWindow = new GameObject();
             GUIWindow.AddComponent<GUIDisplay>();
             GUIWindow.SetActive(false);
+            Debug.Log("ScaleTechs - GlobalGUI: Now Exists");
         }
         internal class GUIDisplay : MonoBehaviour
         {

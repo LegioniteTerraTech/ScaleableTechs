@@ -65,6 +65,7 @@ namespace ScaleableTechs
                 Debug.Log("ScaleTechs: WARNING: FAILIURE TO SUPPRESS \"BoundsIntersectSphere\"!");
                 Debug.Log(e);
             }
+            RescaleSystem.Initiate();
             GlobalScaleGUIController.Initiate();
             Debug.Log("ScaleTechs - GlobalGUI: Now Exists");
 
@@ -129,7 +130,7 @@ namespace ScaleableTechs
         {
             private static void Postfix(TankBlock __instance)
             {
-                var ModuleAdd = __instance.gameObject.AddComponent<RescaleSystem.ModuleScaleWithSize>();
+                var ModuleAdd = __instance.gameObject.AddComponent<ModuleScaleWithSize>();
                 ModuleAdd.TankBlock = __instance;
                 ModuleAdd.OnPool();
             }
@@ -143,7 +144,7 @@ namespace ScaleableTechs
         {
             private static void Postfix(Tank __instance)
             {
-                var TankChange = __instance.gameObject.AddComponent<RescaleSystem.RescaleableTank>();
+                var TankChange = __instance.gameObject.AddComponent<RescaleableTank>();
                 TankChange.Subscribe(__instance);
             }
         }
@@ -209,7 +210,7 @@ namespace ScaleableTechs
         }
     }
 
-    class UpdateFreakingWheels
+    internal class UpdateFreakingWheels
     {
         // I take absolutely no credit for this part, just needed to update the radius of the freaking wheels
         //   >>> All credit for this code goes to Aceba1(Whitepaw) and FireFlyWater <<<
