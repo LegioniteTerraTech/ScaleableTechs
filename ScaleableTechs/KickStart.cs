@@ -65,9 +65,8 @@ namespace ScaleableTechs
                 Debug.Log("ScaleTechs: WARNING: FAILIURE TO SUPPRESS \"BoundsIntersectSphere\"!");
                 Debug.Log(e);
             }
-            RescaleSystem.Initiate();
+            RescaleManager.Initiate();
             GlobalScaleGUIController.Initiate();
-            Debug.Log("ScaleTechs - GlobalGUI: Now Exists");
 
             //Make the Localized Pip GUI
             var GamerObject = new GameObject("PipGUIController");
@@ -95,17 +94,17 @@ namespace ScaleableTechs
             GUIMenuHotKey.onValueSaved.AddListener(() => { keyInt = (int)(hotKey = GUIMenuHotKey.SavedValue); GlobalScaleGUIController.Save(); });
 
             noPreventLogsplosion = new OptionToggle("Enable All Techs Rescaling", TechScaleProperties, dontPreventLogSpam);
-            noPreventLogsplosion.onValueSaved.AddListener(() => { dontPreventLogSpam = noPreventLogsplosion.SavedValue; });
+            noPreventLogsplosion.onValueSaved.AddListener(() => { dontPreventLogSpam = noPreventLogsplosion.SavedValue; RescaleManager.UpdateAll(); GlobalScaleGUIController.Save(); });
             randomEnemyScale = new OptionToggle("Random Enemy Scaling", TechScaleProperties, RandomEnemyScales);
-            randomEnemyScale.onValueSaved.AddListener(() => { RandomEnemyScales = randomEnemyScale.SavedValue; });
+            randomEnemyScale.onValueSaved.AddListener(() => { RandomEnemyScales = randomEnemyScale.SavedValue; RescaleManager.UpdateAllEnemies(); GlobalScaleGUIController.Save(); });
 
             resetPlayerScaleWhenBuilding = new OptionToggle("Scale to 1 in Build Beam", TechScaleProperties, ResetPlayerScale);
-            resetPlayerScaleWhenBuilding.onValueSaved.AddListener(() => { ResetPlayerScale = resetPlayerScaleWhenBuilding.SavedValue; });
+            resetPlayerScaleWhenBuilding.onValueSaved.AddListener(() => { ResetPlayerScale = resetPlayerScaleWhenBuilding.SavedValue; GlobalScaleGUIController.Save(); });
 
             allTechsScale = new OptionRange("Global Tech Scale", TechScaleProperties, GlobalAimedScale, 0.5f, 2.0f, 0.1f);
-            allTechsScale.onValueSaved.AddListener(() => { GlobalAimedScale = allTechsScale.SavedValue; });
+            allTechsScale.onValueSaved.AddListener(() => { GlobalAimedScale = allTechsScale.SavedValue; GlobalScaleGUIController.Save(); });
             unInstall = new OptionToggle("\n<b>Prepare for Uninstall</b>  \n(Toggle this OFF and Save your Techs & Worlds to keep!)", TechScaleProperties, unInstallTrue);
-            unInstall.onValueSaved.AddListener(() => { unInstallTrue = unInstall.SavedValue; });
+            unInstall.onValueSaved.AddListener(() => { unInstallTrue = unInstall.SavedValue; RescaleManager.UpdateAll(); GlobalScaleGUIController.Save(); });
         }
 
         public static bool LookForMod(string name)

@@ -10,14 +10,16 @@ namespace ScaleableTechs
         static private Rect BlockWindow = new Rect(200, 0, 220, 110);   // normie screen
         static private Rect BlockWindow2 = new Rect(200, 0, 360, 110);  // CRITICAL ERROR!!!
         static public GameObject GUIWindow;
+        static public bool isSaving = false;
 
         static private void GUIHandler(int ID)
         {
             //Control the scale of Techs worldwide
+            float prevScale = KickStart.GlobalAimedScale;
             KickStart.GlobalAimedScale = GUI.HorizontalSlider(new Rect(20, 80, 160, 15), Mathf.Round(KickStart.GlobalAimedScale * 10) / 10, 0.5f, 2.0f);
             int sizeMatters = (int)(KickStart.GlobalAimedScale * 100);
             GUI.Label(new Rect(20, 60, 160, 20), "GLOBAL TECH SIZE: " + sizeMatters + "%");
-            if (RescaleSystem.CriticalError == true)
+            if (RescaleManager.CriticalError == true)
             {
                 GUI.Label(new Rect(20, 30, 330, 20), "The Mod \"Control Blocks\" is unsupported!");
                 GUI.Label(new Rect(20, 45, 330, 20), "   ������                                          ATTEMPT RECOVERY");
@@ -32,6 +34,8 @@ namespace ScaleableTechs
                 if (KickStart.dontPreventLogSpam == false)
                     GUI.Label(new Rect(20, 45, 160, 20), "Affects ALL Techs");
             }
+            if (prevScale != KickStart.GlobalAimedScale)
+                RescaleManager.FetchAllNeedsUpdate();
             GUI.DragWindow();
         }
 
@@ -51,10 +55,13 @@ namespace ScaleableTechs
 
         public static void Save()
         {
-            Debug.Log("\nScaleTechs: Writing to Config...");
-            KickStart._thisModConfig.WriteConfigJsonFile();
+            if (!isSaving)
+            {
+                Debug.Log("\nScaleTechs: Writing to Config...");
+                KickStart._thisModConfig.WriteConfigJsonFile();
+                isSaving = true;
+            }
         }
-
         public static void Initiate()
         {
             new GameObject("GlobalScaleGUIController").AddComponent<GlobalScaleGUIController>();
@@ -67,7 +74,7 @@ namespace ScaleableTechs
         {
             private void OnGUI()
             {
-                if (RescaleSystem.CriticalError == true && GUIIsActive)
+                if (RescaleManager.CriticalError == true && GUIIsActive)
                 {
                     BlockWindow2 = GUI.Window(1337, BlockWindow2, GUIHandler, "ScaleTech Has Encountered a Serious Error!");
                 }

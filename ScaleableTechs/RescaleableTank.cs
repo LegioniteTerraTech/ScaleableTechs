@@ -15,12 +15,11 @@ namespace ScaleableTechs
 
         public bool NeedsUpdate = false;
 
-        public bool isAnchored = false;
         public bool isThisTony = false;
-        public bool lastExternalRequestState = false;
 
         // Pip Particles variables
         // - Basics
+        public bool HasPip = false;
         public bool isPipDynamic = false;
         public float DynamicScale = 1f;
         public bool isPipLocked = false;
@@ -37,122 +36,113 @@ namespace ScaleableTechs
         public float minPipRangeA = 1f;
 
 
-
         // Self-updating variables
-        private float AimedScale;//What we automatically try to rescale to while RescaleUpdate() is active
-        private float LocalAimedScale = 1f;
+        private float CurrentScale = 1f;//What we automatically try to rescale to while RescaleUpdate() is active
+        private float AimedScale = 1f;
         private bool ControlBlockBotched = false; // Let the player know 
         private Vector3 COM;
         private Vector3 inertiaTensorSav;
 
         private float randomScale = 0f;
         private float lastBlockCount = 1f;
-        private bool pendingUpdate = false;
         private float lastGlobalAimedScale;
         private bool lastAnchorState;
 
 
-        //RescaleUpdate Variables
-        private static float snapThreshold = scalingSpeed + 0.001f;
-        private static float COMUpdateThreshold = 0.1f;
-        private static float COMUpdate = 0.0f;
-        private static float COMDragValue = 0f;
-        //private static float trueHeightValue = 0f;
-        private string lastName = "null";
-        private float lastBestValue = 0f;
-        private int lastTeam = 0;//how fast we rescale
-
-
         // Update handling variables
-        public static float scalingSpeed = 0.005f;//how fast we rescale
-                                                  //private static float redetermineThreshold = 0.05f;//When do we want to update all blocks on Tech again?
-        public static int TechQueue = 0;//how fast we rescale
+        const float scaleRate = 0.5f;
+        private float scalingSpeed { get { return Time.fixedDeltaTime * scaleRate; } }
+        private float snapThreshold { get { return scalingSpeed; } }
+        private float COMDragValue = 1;
+        //private static float trueHeightValue = 0f;
+        private float lastBestValue = 0f;
 
 
         public void Subscribe(Tank tank)
         {
             this.tank = tank;
-            tank.AttachEvent.Subscribe(AddBlock);
-            tank.DetachEvent.Subscribe(RemoveBlock);
-            tank.AnchorEvent.Subscribe(OnAnchor);
-            tank.PostSpawnEvent.Subscribe(OnSwitch);
+            tank.AttachEvent.Subscribe(OnAttach);
+            tank.DetachEvent.Subscribe(OnDetach);
+            //tank.AnchorEvent.Subscribe(OnAnchor);
+            //tank.PostSpawnEvent.Subscribe(OnSpawn);
             tank.TankRecycledEvent.Subscribe(OnRecycle);
         }
-        public void AddBlock(TankBlock tankblock, Tank tank)
+        public void OnAttach(TankBlock tankblock, Tank tank)
         {
-            tankblock.GetComponent<ModuleScaleWithSize>().rescaleableTank = this;
-            UpdateAllModuleScaleWithSize(true);
+            if (tank == this.tank)
+            {
+                tankblock.GetComponent<ModuleScaleWithSize>().rescaleableTank = this;
+                UpdateAllModuleScaleWithSize(true);
+            }
         }
-
-        public void RemoveBlock(TankBlock tankblock, Tank tank)
+        public void OnDetach(TankBlock tankblock, Tank tank)
         {
-            tankblock.GetComponent<ModuleScaleWithSize>().rescaleableTank = null;
+            if (tank == this.tank)
+            {
+                tankblock.GetComponent<ModuleScaleWithSize>().rescaleableTank = null;
+            }
         }
-
         public void OnAnchor(ModuleAnchor moduleAnchor, bool unUsed, bool unUsed2)
         {
             var ThisInst = tank.GetComponent<RescaleableTank>();
-            ThisInst.lastAnchorState = true;
+            lastAnchorState = true;
             //Debug.Log("AnchorUpdate");
         }
-
-
-        public void OnSwitch()
+        public void OnSpawn()
         {   //RESET ALL 
-            var ThisInst = tank.GetComponent<RescaleableTank>();
-            RescaleEntireTech(1f);
-            ThisInst.AimedScale = 1f;
-            ThisInst.LocalAimedScale = 1f;
-            ThisInst.isPipDynamic = false;
-            ThisInst.isPipDynamicA = false;
-            ThisInst.isPipLocked = false;
-            ThisInst.isPipLockedA = false;
-            ThisInst.DynamicScale = 1f;
-            ThisInst.DynamicScaleA = 1f;
-            ThisInst.maxPipRange = 1f;
-            ThisInst.minPipRange = 1f;
-            ThisInst.maxPipRangeA = 1f;
-            ThisInst.minPipRangeA = 1f;
-            ThisInst.randomScale = 0f;
-            ThisInst.ControlBlockBotched = false;
+            RescaleEntireTech();
+            
+            AimedScale = 1f;
+            HasPip = false;
+            isPipDynamic = false;
+            isPipDynamicA = false;
+            isPipLocked = false;
+            isPipLockedA = false;
+            DynamicScale = 1f;
+            DynamicScaleA = 1f;
+            maxPipRange = 1f;
+            minPipRange = 1f;
+            maxPipRangeA = 1f;
+            minPipRangeA = 1f;
+            randomScale = 0f;
+            ControlBlockBotched = false;
         }
         public void OnRecycle(Tank tank)
         {   //RESET ALL
-            OnSwitch();
-            Debug.Log("OnRecycle - " + tank.name);
+            OnSpawn();
+            //Debug.Log("OnRecycle - " + tank.name);
         }
 
         public void TankIsScrewed()
         {   //oh, did I mention that fixing oddly-scaled Control Blocks clusterbodies is near impossible?
             //if (KickStart.AttemptRecovery == false)
             //    RescaleEntireTech(1f);//GET BACK TO NORMAL ASAP
-            var ThisInst = tank.GetComponent<RescaleableTank>();
-            ThisInst.ControlBlockBotched = true;
-            CriticalError = true;
+            ControlBlockBotched = true;
+            RescaleManager.CriticalError = true;
         }
 
         public void PipReceived(float valueIn, bool isDynamic, bool isStrong, bool isAnchored, float newMin, float newMax)
         {   //When a Pip is thrown on the tech
-            var ThisInst = tank.GetComponent<RescaleableTank>();
+            HasPip = true;
             if (isAnchored)
             {
                 if (isStrong)
                 {
-                    ThisInst.isPipLockedA = true;
-                    ThisInst.savedPipValueA = valueIn;
+                    isPipLockedA = true;
+                    savedPipValueA = valueIn;
                     //Debug.Log("ScaleTechs: Logged ANCHORED Strong savedPipValue " + savedPipValue);
                 }
-                else if (isDynamic && ThisInst.isPipLockedA == false)
+                else if (isDynamic && isPipLockedA == false)
                 {
-                    ThisInst.isPipDynamicA = isDynamic;
-                    if (ThisInst.maxPipRangeA <= newMax)
-                        ThisInst.maxPipRangeA = newMax;
-                    if (ThisInst.minPipRangeA >= newMin)
-                        ThisInst.minPipRangeA = newMin;
+                    isPipDynamicA = isDynamic;
+                    if (maxPipRangeA <= newMax)
+                        maxPipRangeA = newMax;
+                    if (minPipRangeA >= newMin)
+                        minPipRangeA = newMin;
                 }
-                else if (ThisInst.isPipDynamicA == false && ThisInst.isPipLockedA == false)
+                else if (isPipDynamicA == false && isPipLockedA == false)
                 {
-                    ThisInst.savedPipValueA = valueIn;
+                    savedPipValueA = valueIn;
                     //Debug.Log("ScaleTechs: Logged ANCHORED savedPipValue " + savedPipValue);
                 }
             }
@@ -160,21 +150,21 @@ namespace ScaleableTechs
             {
                 if (isStrong)
                 {
-                    ThisInst.isPipLocked = true;
-                    ThisInst.savedPipValue = valueIn;
+                    isPipLocked = true;
+                    savedPipValue = valueIn;
                     //Debug.Log("ScaleTechs: Logged Strong savedPipValue " + savedPipValue);
                 }
-                else if (isDynamic && ThisInst.isPipLocked == false)
+                else if (isDynamic && isPipLocked == false)
                 {
-                    ThisInst.isPipDynamic = true;
-                    if (ThisInst.maxPipRange <= newMax)
-                        ThisInst.maxPipRange = newMax;
-                    if (ThisInst.minPipRange >= newMin)
-                        ThisInst.minPipRange = newMin;
+                    isPipDynamic = true;
+                    if (maxPipRange <= newMax)
+                        maxPipRange = newMax;
+                    if (minPipRange >= newMin)
+                        minPipRange = newMin;
                 }
-                else if (ThisInst.isPipDynamic == false && ThisInst.isPipLocked == false)
+                else if (isPipDynamic == false && isPipLocked == false)
                 {
-                    ThisInst.savedPipValue = valueIn;
+                    savedPipValue = valueIn;
                     //Debug.Log("ScaleTechs: Logged savedPipValue " + savedPipValue);
 
                 }
@@ -183,12 +173,10 @@ namespace ScaleableTechs
 
         public void SetDynamicScale(float set, bool anchored)
         {   // Save/set the dynamic scale in the current instance of the tank
-            var ThisInst = tank.GetComponent<RescaleableTank>();
             if (anchored)
-                ThisInst.DynamicScaleA = set;
+                DynamicScaleA = set;
             else
-                ThisInst.DynamicScale = set;
-            ThisInst.lastExternalRequestState = true;
+                DynamicScale = set;
         }
 
 
@@ -196,6 +184,8 @@ namespace ScaleableTechs
         {
             // Update this on each block addition
             //   Scale to the default to get tailored COM
+            if (!(bool)tank.rbody)
+                return;
 
             float localVariable = tank.transform.localScale.x;
             //Debug.Log("ScaleTechs: Current COM is " + tank.transform.GetComponent<Rigidbody>().centerOfMass + " on " + tank.name);
@@ -206,11 +196,11 @@ namespace ScaleableTechs
             tank.ResetPhysics();
             COM = tank.CenterOfMass;
             //Debug.Log("ScaleTechs: Grabbed natural COM " + COM + " on " + tank.name);
-            inertiaTensorSav = gameObject.transform.GetComponent<Rigidbody>().inertiaTensor;
+            inertiaTensorSav = tank.rbody.inertiaTensor;
             //Debug.Log("ScaleTechs: Grabbed natural inertia tensor " + inertiaTensorSav + " on " + tank.name);
 
 
-            COMDragValue = tank.transform.GetComponent<Rigidbody>().drag;
+            COMDragValue = tank.rbody.drag;
             //now actually SCAAAAALE BAAAACK 
             RescaleEntireTech(localVariable);
         }
@@ -219,376 +209,268 @@ namespace ScaleableTechs
         {
             //Fairly demanding - Update this on each block addition
             //Scale to the default to get tailored COM
+            if (!(bool)tank.rbody)
+                return;
 
             float localVariable = tank.transform.localScale.x;
             Vector3 ReCalcCOM;
             ReCalcCOM = COM * localVariable;
-            tank.transform.GetComponent<Rigidbody>().centerOfMass = ReCalcCOM;
+            tank.rbody.centerOfMass = ReCalcCOM;
 
             //Debug.Log("ScaleTechs: Force synced COM on " + tank.name + " to " + COM + " Yielding " + tank.transform.GetComponent<Rigidbody>().centerOfMass);
             ReCalcCOM = inertiaTensorSav * localVariable;
-            tank.transform.GetComponent<Rigidbody>().inertiaTensor = ReCalcCOM;
+            tank.rbody.inertiaTensor = ReCalcCOM;
             //Debug.Log("ScaleTechs: Force synced COM on " + tank.name + " to " + inertiaTensorSav + " Yielding " + tank.transform.GetComponent<Rigidbody>().inertiaTensor);
 
-            tank.transform.GetComponent<Rigidbody>().drag = COMDragValue * (localVariable / 2 + 0.5f);
+            tank.rbody.drag = COMDragValue * (localVariable / 2 + 0.5f);
         }
 
-        public void RescaleEntireTech(float localVariable)
+        public void RescaleEntireTech(float localVariable = 1)
         {
             //now actually SCAAAAALE
-            Vector3 reScale = tank.transform.localScale;
-            reScale = Vector3.one * localVariable;
-            tank.transform.localScale = reScale;
+            tank.transform.localScale = Vector3.one * localVariable;
             //LOL THIS WORKS
         }
 
 
-        private static bool updateScaleRequestBool = false;
-        private static float updateScaleRequest = 0;
-        private static float updateScaleRequestPhy = 0;
 
-        public void FixedUpdate()
-        {   //Speed up animation if nesseary according the ingame physics
-            if (updateScaleRequestBool)
-            {
-                updateScaleRequestPhy++;
-            }
-            if (updateScaleRequestPhy >= 25)
-            {
-                scalingSpeed = 15625 / (updateScaleRequest * updateScaleRequest * updateScaleRequest) * 0.01f;// Speed up if nesseary
-                snapThreshold = scalingSpeed + 0.0025f;
-                COMUpdateThreshold = scalingSpeed * 10;
-                //Debug.Log("ScaleTechs: changed scalingSpeed to " + scalingSpeed);
-                updateScaleRequestBool = false;
-                updateScaleRequest = 0;
-                updateScaleRequestPhy = 0;
-            }
+        public void RequestUpdate()
+        {
+            RescaleManager.QueueUpdater(tank);
         }
-        public void UpdateTank()
+        public bool GetNeedsUpdate()
+        {
+            //Update if anything changes
+            CurrentScale = tank.transform.localScale.x;
+
+            if (lastBlockCount != tank.blockman.IterateBlocks().Count() || KickStart.GlobalAimedScale != lastGlobalAimedScale || tank.IsAnchored  != lastAnchorState)
+            {
+                Debug.Log("ScaleTechs: Update requested - " + KickStart.GlobalAimedScale + "|" + lastGlobalAimedScale + " || " + tank.blockman.blockCount + "|" + lastBlockCount + " || " + lastAnchorState);
+                lastBlockCount = tank.blockman.blockCount;
+                lastGlobalAimedScale = KickStart.GlobalAimedScale;
+                lastAnchorState = tank.IsAnchored;
+                NeedsUpdate = true;
+                return true;
+            }
+
+            return false;
+        }
+        public void GetAimedScale()
+        {
+            // Get the scale to reach for
+            if (KickStart.ResetPlayerScale && Singleton.playerTank == tank && tank.beam.IsActive)
+                AimedScale = 1;
+            else if (HasPip)
+            {
+                if (isPipDynamicA && tank.IsAnchored && isPipLockedA == false)
+                {   //Is the tech anchored and have an anchored-only dynamic pip?
+                    AimedScale = DynamicScaleA;
+                }
+                else if (isPipDynamic && isPipLocked == false)
+                {   //Is the tech anchored and have a dynamic pip?
+                    AimedScale = DynamicScale;
+                }
+                else if (savedPipValueA != 1f && tank.IsAnchored)
+                {   //Is the tech anchored and have an anchored-only pip?
+                    AimedScale = savedPipValueA;
+                }
+                else
+                {   //Does this tank have a valid pip?
+                    AimedScale = savedPipValue;
+                }
+            }
+            else
+                AimedScale = KickStart.GlobalAimedScale;
+
+
+        }
+        public bool UpdateTank()
         {
             //  Big or small, does them all!
-            //Get the current instance
-            var ThisInst = tank.GetComponent<RescaleableTank>();
-            ThisInst.isAnchored = tank.IsAnchored;
 
             //Run the numbers
-            float localVariable = tank.transform.localScale.x;
-            ThisInst.AimedScale = KickStart.GlobalAimedScale;
+            CurrentScale = tank.transform.localScale.x;
 
-            //update checking
-            if (updateScaleRequestBool)
-                updateScaleRequest++;
+            GetAimedScale();
 
+            // Now handle the important stuff
+            //GetAllBlocksInfo();
 
-            //Update if anything changes
-            if (ManPauseGame.inst.IsPauseMenuShowing() == false)
+            if (tank.name == "Big Tony" && tank.IsEnemy())
             {
-                if (tank.FirstUpdateAfterSpawn || ThisInst.lastBlockCount != tank.blockman.blockCount || KickStart.GlobalAimedScale != ThisInst.lastGlobalAimedScale || ThisInst.lastAnchorState || handoffUpdateLoopLast != ManTechs.inst.Count || lastExternalRequestState || tank.Team != ThisInst.lastTeam || ThisInst.lastName != tank.name)
+                AimedScale = 2f;
+                if (isThisTony == false)
                 {
-                    Debug.Log("ScaleTechs: Update requested - " + KickStart.GlobalAimedScale + lastGlobalAimedScale + " || " + tank.blockman.blockCount + ThisInst.lastBlockCount + " || " + ThisInst.lastAnchorState);
-                    if (handoffUpdateLoopLast != ManTechs.inst.Count)
-                        handoffUpdate = ManTechs.inst.Count;
-                    ThisInst.lastBlockCount = tank.blockman.blockCount;
-                    ThisInst.lastGlobalAimedScale = KickStart.GlobalAimedScale;
-                    ThisInst.lastTeam = tank.Team;
-                    ThisInst.lastAnchorState = false;
-                    ThisInst.pendingUpdate = true;
-                    if (ThisInst.lastName != tank.name)
-                        OnSwitch(); //Because none of the subscribeables trigger on tech swap
-                    ThisInst.lastName = tank.name;
-                }
-
-
-                //Handle player updates for autoscaling
-                if (KickStart.ResetPlayerScale && tank.PlayerFocused == true)
-                {
-                    if (tank.beam.IsActive)
-                    {
-                        //Debug.Log("ScaleTechs: BUILD TIMER " + lastBuildTime);
-                        if (ThisInst.AimedScale != localVariable)
-                        {
-                            RescaleUpdate(localVariable);
-                        }
-                    }
-                    else
-                    {
-                        var gamName = ManGameMode.inst.GetCurrentGameMode();
-                        if (gamName == "ModeMain" || gamName == "ModeMisc")
-                            ThisInst.pendingUpdate = true;
-                    }
-                }
-                ThisInst.lastExternalRequestState = false;
-
-                if (handoffUpdate > 0 || ThisInst.pendingUpdate)
-                {
-
-                    // Now handle the important stuff
-                    GetAllBlocksInfo();
-
-                    if (ThisInst.ControlBlockBotched == true && KickStart.AttemptRecovery == false)
-                    {
-                        localVariable = 1f;
-                        RescaleEntireTech(1f);
-                        ThisInst.AimedScale = 1f;
-                        if (ControlBlockWarningIssued == false)
-                        {
-                            UpdateAllModuleScaleWithSize(true);
-                            CriticalError = true;
-                            ControlBlockWarningIssued = true;
-                            Debug.Log("\n-------------------------------------------------------------------------------");
-                            Debug.Log("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-                            Debug.Log("|!| ScaleTechs: LOCKDOWN ON " + tank.name + " AS IT CONTAINS CONTROL BLOCKS |!|");
-                            Debug.Log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-                            Debug.Log("\n-------------------------------------------------------------------------------\n");
-                        }
-                    }
-                    else if (ThisInst.DynamicScaleA != 1f && ThisInst.isPipDynamicA && tank.IsAnchored && ThisInst.isPipLockedA == false)
-                    {   //Is the tech anchored and have an anchored-only dynamic pip?
-                        ThisInst.LocalAimedScale = ThisInst.DynamicScaleA;
-
-                        //Apply sizes
-                        ThisInst.AimedScale = ThisInst.LocalAimedScale;
-                        //Debug.Log("ScaleTechs: Synced ANCHORED DYNAMIC Pip scaling to Local Scale " + LocalAimedScale + " on " + tank.name);
-                        if (tank.FirstUpdateAfterSpawn)
-                        {
-                            //TECH WAS LIKELY IN THE WORLD AND MUST MAINTAIN SCALE IMMEDEATELY TO PREVENT ISSUES
-                            localVariable = ThisInst.LocalAimedScale;
-                            RescaleEntireTech(localVariable);
-                            UpdateAllModuleScaleWithSize(true);
-                            Debug.Log("ScaleTechs: First ANCHORED DYNAMIC Pip Particles update after spawn for " + tank.name);
-                        }
-                    }
-                    else if (ThisInst.DynamicScale != 1f && ThisInst.isPipDynamic && ThisInst.isPipLocked == false)
-                    {   //Is the tech anchored and have a dynamic pip?
-                        ThisInst.LocalAimedScale = ThisInst.DynamicScale;
-
-                        //Apply sizes
-                        ThisInst.AimedScale = ThisInst.LocalAimedScale;
-                        //Debug.Log("ScaleTechs: Synced DYNAMIC Pip scaling to Local Scale " + LocalAimedScale + " on " + tank.name);
-                        if (tank.FirstUpdateAfterSpawn)
-                        {
-                            //TECH WAS LIKELY IN THE WORLD AND MUST MAINTAIN SCALE IMMEDEATELY TO PREVENT ISSUES
-                            localVariable = ThisInst.LocalAimedScale;
-                            RescaleEntireTech(localVariable);
-                            UpdateAllModuleScaleWithSize(true);
-                            Debug.Log("ScaleTechs: First DYNAMIC Pip Particles update after spawn for " + tank.name);
-                        }
-                    }
-                    else if (ThisInst.savedPipValueA != 1f && tank.IsAnchored)
-                    {   //Is the tech anchored and have an anchored-only pip?
-                        ThisInst.LocalAimedScale = ThisInst.savedPipValueA;
-
-                        //Apply sizes
-                        ThisInst.AimedScale = ThisInst.LocalAimedScale;
-                        //Debug.Log("ScaleTechs: Synced ANCHORED Pip scaling to Local Scale " + LocalAimedScale + " on " + tank.name);
-                        if (tank.FirstUpdateAfterSpawn)
-                        {
-                            //TECH WAS LIKELY IN THE WORLD AND MUST MAINTAIN SCALE IMMEDEATELY TO PREVENT ISSUES
-                            localVariable = ThisInst.LocalAimedScale;
-                            RescaleEntireTech(localVariable);
-                            UpdateAllModuleScaleWithSize(true);
-                            Debug.Log("ScaleTechs: First ANCHORED Pip Particles update after spawn for " + tank.name);
-                        }
-                    }
-                    else if (ThisInst.savedPipValue != 1f)
-                    {   //Does this tank have a valid pip?
-                        ThisInst.LocalAimedScale = ThisInst.savedPipValue;
-
-                        //Apply sizes
-                        ThisInst.AimedScale = ThisInst.LocalAimedScale;
-                        //Debug.Log("ScaleTechs: Synced Pip scaling to Local Scale " + LocalAimedScale + " on " + tank.name);
-                        if (tank.FirstUpdateAfterSpawn)
-                        {
-                            //TECH WAS LIKELY IN THE WORLD AND MUST MAINTAIN SCALE IMMEDEATELY TO PREVENT ISSUES
-                            localVariable = ThisInst.LocalAimedScale;
-                            RescaleEntireTech(localVariable);
-                            UpdateAllModuleScaleWithSize(true);
-                            Debug.Log("ScaleTechs: First Pip Particles update after spawn for " + tank.name);
-                        }
-                    }
-                    else
-                    {
-                        // Else if this is a tech we check to rescale it to the global value
-                        //Debug.Log("ScaleTechs: Synced scaling to GLOBAL Scale " + KickStart.GlobalAimedScale + " on " + tank.name);
-                        if (KickStart.RandomEnemyScales && tank.IsEnemy())
-                        {
-                            if (tank.FirstUpdateAfterSpawn)
-                            {
-                                //It's likely a fresh new tech or newly loaded in - reset scaling to cycle scale
-                                localVariable = 1f;
-                                ThisInst.randomScale = 0f;
-                                RescaleEntireTech(localVariable);
-                                UpdateAllModuleScaleWithSize(true);
-                                Debug.Log("ScaleTechs: First update after spawn for " + tank.name);
-                            }
-                            if (ThisInst.randomScale == 0f)
-                            {
-                                ThisInst.randomScale = UnityEngine.Random.Range(0.6f, 1.8f);
-                                Debug.Log("ScaleTechs: Tank " + tank.name + " has been rescaled to " + ThisInst.randomScale);
-                            }
-                            ThisInst.AimedScale = ThisInst.randomScale;
-                            enemyCount++;
-                        }
-                        else if (tank.FirstUpdateAfterSpawn)
-                        {
-                            //It's likely a fresh new tech or newly loaded in - reset scaling to cycle scale
-                            localVariable = 1f;
-                            RescaleEntireTech(localVariable);
-                            UpdateAllModuleScaleWithSize(true);
-                            Debug.Log("ScaleTechs: First update after spawn for " + tank.name);
-                        }
-                    }
-                    if (tank.name == "Big Tony" && tank.IsEnemy())
-                    {
-                        ThisInst.AimedScale = 2f;
-                        if (ThisInst.isThisTony == false)
-                        {
-                            ThisInst.isThisTony = true;
-                            Debug.Log("ScaleTechs: Tony detected! Upgrading!");
-                            handoffUpdate = ManTechs.inst.Count;
-                            localVariable = 1f;
-                            RescaleEntireTech(localVariable);
-                        }
-                    }
-                    else
-                        ThisInst.isThisTony = false;
-
-                    //Do we want to only change player Tech?
-                    if (KickStart.dontPreventLogSpam == false && tank.PlayerFocused == false)
-                        ThisInst.AimedScale = 1f;
-
-
-                    //Check if the Tech contains a Pip Particles module, if so the rescale based on saved value in TankBlock (retrived from community of Pip Blocks)
-                    //  If the state is not teh same as laststate
-                    if (ThisInst.AimedScale != localVariable)
-                        RescaleUpdate(localVariable);
-                    else
-                    {
-                        handoffUpdate--;//Let the system know we are done updating
-                        if (ThisInst.pendingUpdate == true)
-                        {
-                            COMReCalc();
-                            AttemptCOMRebalance();
-                            UpdateAllModuleScaleWithSize(true);
-                            ThisInst.pendingUpdate = false;
-                        }
-                    }
+                    isThisTony = true;
+                    //Debug.Log("ScaleTechs: Tony detected! Upgrading!");
+                    RescaleEntireTech();
                 }
             }
             else
             {
-                //Debug.Log("ScaleTechs: GAME COUNTS AS PAUSED!");
+                if (ControlBlockBotched == true && KickStart.AttemptRecovery == false)
+                {
+                    RescaleEntireTech(1f);
+                    AimedScale = 1f;
+                    if (RescaleManager.ControlBlockWarningIssued == false)
+                    {
+                        UpdateAllModuleScaleWithSize(true);
+                        RescaleManager.CriticalError = true;
+                        RescaleManager.ControlBlockWarningIssued = true;
+                        Debug.Log("\n-------------------------------------------------------------------------------");
+                        Debug.Log("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                        Debug.Log("|!| ScaleTechs: LOCKDOWN ON " + tank.name + " AS IT CONTAINS CONTROL BLOCKS |!|");
+                        Debug.Log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                        Debug.Log("\n-------------------------------------------------------------------------------\n");
+                    }
+                }
+                else if (HasPip)
+                {   //Is the tech anchored and have an anchored-only dynamic pip?
+                    if (tank.FirstUpdateAfterSpawn)
+                    {
+                        //TECH WAS LIKELY IN THE WORLD AND MUST MAINTAIN SCALE IMMEDEATELY TO PREVENT ISSUES
+                        RescaleEntireTech(AimedScale);
+                        UpdateAllModuleScaleWithSize(true);
+                        //Debug.Log("ScaleTechs: First ANCHORED DYNAMIC Pip Particles update after spawn for " + tank.name);
+                    }
+                }
+                else
+                {   // Else if this is a tech we check to rescale it to the global value
+                    //Debug.Log("ScaleTechs: Synced scaling to GLOBAL Scale " + KickStart.GlobalAimedScale + " on " + tank.name);
+                    if (KickStart.RandomEnemyScales && tank.IsEnemy())
+                    {
+                        if (tank.FirstUpdateAfterSpawn)
+                        {
+                            //It's likely a fresh new tech or newly loaded in - reset scaling to cycle scale
+                            randomScale = 0f;
+                            RescaleEntireTech();
+                            UpdateAllModuleScaleWithSize(true);
+                            //Debug.Log("ScaleTechs: First update after spawn for " + tank.name);
+                        }
+                        if (randomScale == 0f)
+                        {
+                            randomScale = UnityEngine.Random.Range(0.6f, 1.8f);
+                            //Debug.Log("ScaleTechs: Tank " + tank.name + " has been rescaled to " + randomScale);
+                        }
+                        AimedScale = randomScale;
+                    }
+                    else if (tank.FirstUpdateAfterSpawn)
+                    {
+                        //It's likely a fresh new tech or newly loaded in - reset scaling to cycle scale
+                        RescaleEntireTech();
+                        UpdateAllModuleScaleWithSize(true);
+                        //Debug.Log("ScaleTechs: First update after spawn for " + tank.name);
+                    }
+                }
             }
 
-            // Check if all techs were updated
-            if (handoffUpdateLoopChecker >= ManTechs.inst.Count)
+            //Do we want to only change player Tech?
+            if (KickStart.dontPreventLogSpam == false && tank.PlayerFocused == false)
+                AimedScale = 1f;
+
+
+            //Check if the Tech contains a Pip Particles module, if so the rescale based on saved value in TankBlock (retrived from community of Pip Blocks)
+            //  If the state is not teh same as laststate
+            if (AimedScale != CurrentScale)
             {
-                updateScaleRequestBool = true;
-                lastEnemyCount = enemyCount;
-                enemyCount = 0;
-                TechQueue = 0;
-
-                // Loop this again as we are not finished yet
-                if (handoffUpdateLoopLast != ManTechs.inst.Count)
+                if (!RescaleUpdate())
                 {
-                    handoffUpdateLoopLast = ManTechs.inst.Count;
-                    Debug.Log("ScaleTechs: Tech count changed! performing additional loop!");
-                    handoffUpdate = ManTechs.inst.Count;
+                    NeedsUpdate = false;
+                    return true;
                 }
-                else if (handoffUpdate > 0 && Overburdened == true)
-                {
-                    Debug.Log("ScaleTechs: Handoff loop finished with " + handoffUpdate + " tasks remaining for " + ManTechs.inst.Count + " Techs, looping again...");
-                    handoffUpdate = ManTechs.inst.Count;
-                }
-                //else
-                //Debug.Log("ScaleTechs: All rescaling tasks complete.");
-                handoffUpdateLoopChecker = 0;
+            }
+            else
+            {
+                NeedsUpdate = false;
+                return true;
             }
 
-
-            //onto the next tech
-            handoffUpdateLoopChecker++;//Indicate that a tech has been cycled
-            TechQueue++;
+            return false;
         }
 
 
-        private void RescaleUpdate(float localVariable)
+        private bool RescaleUpdate()
         {
-            var ThisInst = tank.GetComponent<RescaleableTank>();
-            if (handoffUpdate > 0)
-                handoffUpdate--;//Let the system know we have stepped an update
-            Vector3 ReCalcHeight;
             bool updateGO = false;
-            if (((COMUpdate - COMUpdateThreshold) < localVariable && localVariable < (COMUpdate + COMUpdateThreshold)) && localVariable != COMUpdate)
+            bool pendingUpdate = false;
+
+            float ScaleChange = CurrentScale;
+
+            /*
+            if (((COMUpdate - COMUpdateThreshold) < CurrentScale && CurrentScale < (COMUpdate + COMUpdateThreshold)) && CurrentScale != COMUpdate)
             {//UPDATE COM
-                COMUpdate = localVariable;
+                COMUpdate = CurrentScale;
                 COMReCalc();
                 AttemptCOMRebalance();
-                UpdateAllModuleScaleWithSize(false, localVariable);
+                UpdateAllModuleScaleWithSize(false, CurrentScale);
                 Debug.Log("ScaleTechs: COM Update for " + tank.name);
                 updateGO = true;
-            }
-            if ((AimedScale - snapThreshold) < localVariable && localVariable < (AimedScale + snapThreshold) && localVariable != AimedScale)
+            }*/
+            if ((AimedScale - snapThreshold) < CurrentScale && CurrentScale < (AimedScale + snapThreshold) && CurrentScale != AimedScale)
             {//SNAP TO EXACT
-                COMUpdate = localVariable;
-                float snapDist = AimedScale - localVariable;
-                localVariable = AimedScale;
+
+                RescaleEntireTech(AimedScale);
                 COMReCalc();
                 AttemptCOMRebalance();
                 UpdateAllModuleScaleWithSize(true);
-                updateGO = true;
 
                 //Offset off the ground accordingly
-                ReCalcHeight = tank.transform.GetComponent<Rigidbody>().position;
-                Debug.Log("ScaleTechs: InitialPosition of " + tank.name + " was " + ReCalcHeight.y);
-                if (snapDist > 0)
-                    ReCalcHeight.y = Mathf.Round((ReCalcHeight.y + (-lastBestValue * (snapDist * localVariable))) * 4) / 4;//We snap to prevent odd floating-point errors
-                else if (snapDist < 0)
-                    ReCalcHeight.y = Mathf.Round((ReCalcHeight.y - (-lastBestValue * (-snapDist * localVariable))) * 4) / 4;//We snap to prevent odd floating-point errors
-                tank.transform.GetComponent<Rigidbody>().position = ReCalcHeight;
-                Debug.Log("ScaleTechs: FinalPosition of " + tank.name + " is " + ReCalcHeight.y);
-
+                TryFixupAnchors();
 
                 Debug.Log("ScaleTechs: Finalizing updates for " + tank.name);
-                ThisInst.pendingUpdate = false;
+                pendingUpdate = false;
             }
-            else if (localVariable < AimedScale)//GROW
+            else if (CurrentScale < AimedScale)//GROW
             {
                 //LERP IN SIZE
-                localVariable = localVariable + (scalingSpeed * localVariable);
+                ScaleChange = CurrentScale + (scalingSpeed * CurrentScale);
                 updateGO = true;
 
                 //Offset off the ground accordingly
-                ReCalcHeight = tank.transform.GetComponent<Rigidbody>().position;
-                ReCalcHeight.y = ReCalcHeight.y + (-lastBestValue * (scalingSpeed * localVariable));
-                tank.transform.GetComponent<Rigidbody>().position = ReCalcHeight;
-                ThisInst.pendingUpdate = true;
+                TryFixupAnchors();
+                pendingUpdate = true;
             }
-            else if (localVariable > AimedScale)//SHRINK
+            else if (CurrentScale > AimedScale)//SHRINK
             {
                 //LERP IN SIZE
-                localVariable = localVariable - (scalingSpeed * localVariable);
+                ScaleChange = CurrentScale - (scalingSpeed * CurrentScale);
                 updateGO = true;
 
                 //Offset off the ground accordingly
-                ReCalcHeight = tank.transform.GetComponent<Rigidbody>().position;
-                ReCalcHeight.y = ReCalcHeight.y - (-lastBestValue * (scalingSpeed * localVariable));
-                tank.transform.GetComponent<Rigidbody>().position = ReCalcHeight;
-                ThisInst.pendingUpdate = true;
+                TryFixupAnchors();
+                pendingUpdate = true;
             }
             else //We are at EXACTLY ideal scale
             {
                 Debug.Log("ScaleTechs: Extra updates for " + tank.name);
-                if (ThisInst.pendingUpdate == true)
+                if (pendingUpdate == true)
                 {
                     COMReCalc();
                     AttemptCOMRebalance();
                     UpdateAllModuleScaleWithSize(true);
-                    ThisInst.pendingUpdate = false;
+                    pendingUpdate = false;
                 }
             }
             if (updateGO)
-                RescaleEntireTech(localVariable);
+                RescaleEntireTech(ScaleChange);
+            return pendingUpdate;
+        }
+        private void TryFixupAnchors()
+        {
+            TechAnchors anchors = tank.Anchors;
+            if (anchors)
+            {
+                if (anchors.NumIsAnchored > 0)
+                {
+                    tank.visible.Teleport(tank.boundsCentreWorldNoCheck, tank.visible.trans.rotation);
+                    if (tank.Anchors.NumAnchored < 1)
+                    {
+                        tank.FixupAnchors();
+                        if (!tank.IsAnchored)
+                            tank.TryToggleTechAnchor();
+                    }
+                }
+            }
         }
 
         private void GetAllBlocksInfo()
@@ -598,95 +480,61 @@ namespace ScaleableTechs
             try
             {
                 float bestValue = 0;
-                int child = tank.transform.childCount;
-                for (int v = 0; v < child; ++v)
+                foreach (TankBlock block in tank.blockman.IterateBlocks())
                 {
-                    Transform grabbedGameObject = tank.transform.GetChild(v);
-                    try
+                    var check = block.GetComponent<ModuleScaleWithSize>();
+                    if (check)
                     {
-                        bestValue = grabbedGameObject.GetComponent<ModuleScaleWithSize>().GetInfo();
+                        bestValue = check.GetInfo();
                         if (lastBestValue > bestValue && lastBestValue >= -64)
                         {
                             lastBestValue = bestValue;
                             //Debug.Log("ScaleTechs: new BestValue is " + lastBestValue + "!");
                         }
                     }
-                    catch
-                    {
-                        //Debug.Log("ScaleTechs: FetchFailiure on " + grabbedGameObject.name + "!");
-                    }
                 }
             }
             catch
             {
-                Debug.Log("ScaleTechs: FetchFailiure on " + tank.name + "!");
+                Debug.Log("ScaleTechs: GetAllBlocksInfo - Failiure on " + tank.name + "!");
             }
             //Debug.Log("ScaleTechs: lastBestValue is " + lastBestValue + "!");
         }
 
-        private void UpdateAllModuleScaleWithSize(bool resetScales)
+        private void UpdateAllModuleScaleWithSize(bool resetScales, float scale = 1)
         {
             //GET CURRENT VALUES
             UpdateFreakingWheels.GrabCurrent();
             try
             {
-                int child = tank.transform.childCount;
-                for (int v = 0; v < child; ++v)
+                float toSet;
+                if (scale == 1)
+                    toSet = AimedScale;
+                else
+                    toSet = scale;
+                foreach (TankBlock block in tank.blockman.IterateBlocks())
                 {
-                    Transform grabbedGameObject = tank.transform.GetChild(v);
-                    try
+                    var check = block.GetComponent<ModuleScaleWithSize>();
+                    if (check)
                     {
-                        grabbedGameObject.GetComponent<ModuleScaleWithSize>().ScaleAccordingly(AimedScale, COM, isThisTony);
-                        if (resetScales)
-                            grabbedGameObject.GetComponent<ModuleScaleWithSize>().ResetScale();
-                    }
-                    catch
-                    {
-                        //Debug.Log(grabbedGameObject + " is not a block");
-                        if (resetScales && grabbedGameObject.name == "")
+                        try
                         {
-                            grabbedGameObject.transform.localScale = Vector3.one;
+                            check.ScaleAccordingly(AimedScale, COM, isThisTony);
+                            if (resetScales)
+                                check.ResetScale();
+                        }
+                        catch
+                        {
+                            Debug.Log("ScaleTechs: " + block.name + " has not been imprinted properly!?");
                         }
                     }
                 }
-                //Debug.Log("ScaleTechs: Rescaled components of " + tank.name + "!");
             }
             catch
             {
-                Debug.Log("ScaleTechs: FetchFailiure on " + tank.name + "!");
+                Debug.Log("ScaleTechs: UpdateAllModuleScaleWithSize - Failiure on " + tank.name + "!");
             }
         }
-        private void UpdateAllModuleScaleWithSize(bool resetScales, float input)
-        {
-            //GET CURRENT VALUES
-            UpdateFreakingWheels.GrabCurrent();
-            try
-            {
-                int child = tank.transform.childCount;
-                for (int v = 0; v < child; ++v)
-                {
-                    Transform grabbedGameObject = tank.transform.GetChild(v);
-                    try
-                    {
-                        grabbedGameObject.GetComponent<ModuleScaleWithSize>().ScaleAccordingly(input, COM, isThisTony);
-                        if (resetScales)
-                            grabbedGameObject.GetComponent<ModuleScaleWithSize>().ResetScale();
-                    }
-                    catch
-                    {
-                        //Debug.Log(grabbedGameObject + " is not a block");
-                        if (resetScales && grabbedGameObject.name == "")
-                        {
-                            grabbedGameObject.transform.localScale = Vector3.one;
-                        }
-                    }
-                }
-                //Debug.Log("ScaleTechs: Rescaled components of " + tank.name + "!");
-            }
-            catch
-            {
-                Debug.Log("ScaleTechs: FetchFailiure on " + tank.name + "!");
-            }
-        }
+
     }
 }

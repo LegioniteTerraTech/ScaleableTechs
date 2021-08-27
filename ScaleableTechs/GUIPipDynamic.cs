@@ -23,32 +23,37 @@ namespace ScaleableTechs
     internal class GUIPipDynamic : MonoBehaviour
     {
         public static GUIPipDynamic inst;
-        private RescaleSystem.ModuleScaleWithSize thisModule;
-        private bool cTargetVisible = false;
-        private bool isAnchored = false;
-        private float tempScale;
+        private static ModuleScaleWithSize thisModule;
+        private static bool cTargetVisible = false;
+        private static bool isAnchored = false;
+        private static float tempScale;
         //private string tempString;
         private readonly int ID = 3099;
 
         private float minScaleTank = 1f;
         private float maxScaleTank = 1f;
 
-        private Rect localScaleGUI;
+        private static Rect localScaleGUI;
 
         public GUIPipDynamic()
         {
             inst = this;
         }
 
-        private void Update()
+        private void Initiate()
+        {
+            Singleton.Manager<ManPointer>.inst.MouseEvent.Subscribe(MouseUpdate);
+        }
+
+        private static void MouseUpdate(ManPointer.Event click, bool y1, bool y2)
         {
             //Debug.Log("ScaleTechs - LocalGUI: RUNNING!");
-            if (!Singleton.Manager<ManPointer>.inst.DraggingItem && Input.GetMouseButtonDown(1))
+            if (!Singleton.Manager<ManPointer>.inst.DraggingItem && click == ManPointer.Event.RMB)
             {
                 localScaleGUI = new Rect(Input.mousePosition.x, Screen.height - Input.mousePosition.y - 75f, 250f, 120f);
                 try
                 {
-                    thisModule = Singleton.Manager<ManPointer>.inst.targetVisible.block.GetComponent<RescaleSystem.ModuleScaleWithSize>();
+                    thisModule = Singleton.Manager<ManPointer>.inst.targetVisible.block.GetComponent<ModuleScaleWithSize>();
                     //Debug.Log("ScaleTechs - LocalGUI: GrabSuccess");
                 }
                 catch
@@ -56,8 +61,13 @@ namespace ScaleableTechs
                     thisModule = null;
                     //Debug.Log("ScaleTechs - LocalGUI: GrabFail");
                 }
+
+                RescaleableTank fetch = thisModule.transform.root.GetComponent<RescaleableTank>();
+                if (!(bool)fetch)
+                    return;
+
                 cTargetVisible = thisModule;
-                if (cTargetVisible && ((thisModule.IsPipParticles && thisModule.IsDynamicPipParticles && thisModule.transform.root.GetComponent<RescaleSystem.RescaleableTank>().isPipLocked == false)
+                if (cTargetVisible && ((thisModule.IsPipParticles && thisModule.IsDynamicPipParticles && fetch.isPipLocked == false)
                     || thisModule.gameObject.name == "_C_BLOCK:584870"))
                 {   //We carry onwards and make this work
                     tempScale = thisModule.SavedScale;
@@ -102,7 +112,7 @@ namespace ScaleableTechs
             }
             try
             {
-                isAnchored = thisModule.transform.root.GetComponent<RescaleSystem.RescaleableTank>().isAnchored;
+                isAnchored = thisModule.transform.root.GetComponent<Tank>().IsAnchored;
                 if (thisModule.gameObject.name == "_C_BLOCK:584870")
                 {
                     minScaleTank = 1f;
@@ -116,14 +126,14 @@ namespace ScaleableTechs
                 else if (isAnchored)
                 {   //Grab Anchored Values
                     GUILayout.Label("Anchored Scale Range: " + minScaleTank.ToString() + " to " + maxScaleTank.ToString());
-                    minScaleTank = thisModule.transform.root.GetComponent<RescaleSystem.RescaleableTank>().minPipRangeA;
-                    maxScaleTank = thisModule.transform.root.GetComponent<RescaleSystem.RescaleableTank>().maxPipRangeA;
+                    minScaleTank = thisModule.transform.root.GetComponent<RescaleableTank>().minPipRangeA;
+                    maxScaleTank = thisModule.transform.root.GetComponent<RescaleableTank>().maxPipRangeA;
                 }
                 else
                 {   //Grab Unanchored Values
                     GUILayout.Label("Scale Range: " + minScaleTank.ToString() + " to " + maxScaleTank.ToString());
-                    minScaleTank = thisModule.transform.root.GetComponent<RescaleSystem.RescaleableTank>().minPipRange;
-                    maxScaleTank = thisModule.transform.root.GetComponent<RescaleSystem.RescaleableTank>().maxPipRange;
+                    minScaleTank = thisModule.transform.root.GetComponent<RescaleableTank>().minPipRange;
+                    maxScaleTank = thisModule.transform.root.GetComponent<RescaleableTank>().maxPipRange;
                 }
 
                 /*
@@ -132,9 +142,9 @@ namespace ScaleableTechs
                 tempString = GUILayout.TextField(tempString);
                 if (GUI.changed && float.TryParse(tempString, out float stringMass))
                 {
-                    tempScale = (int)(Mathf.Clamp(stringMass, minScaleTank, maxScaleTank) * 10) / 10f;
+                    tempScale = (Mathf.Clamp(stringMass, minScaleTank, maxScaleTank) * 10) / 10f;
                     thisModule.SavedScale = tempScale;
-                    thisModule.transform.root.GetComponent<RescaleSystem.RescaleableTank>().SetDynamicScale(tempScale, isAnchored);
+                    thisModule.transform.root.GetComponent<RescaleableTank>().SetDynamicScale(tempScale, isAnchored);
                 }
                 */
 
@@ -144,17 +154,17 @@ namespace ScaleableTechs
                 {
                     //tempString = tempScale.ToString();
                     thisModule.SavedScale = tempScale;
-                    thisModule.transform.root.GetComponent<RescaleSystem.RescaleableTank>().SetDynamicScale(tempScale, isAnchored);
+                    thisModule.transform.root.GetComponent<RescaleableTank>().SetDynamicScale(tempScale, isAnchored);
                 }
-                if (thisModule.transform.root.GetComponent<RescaleSystem.RescaleableTank>().DynamicScale != 1f)
-                    GUILayout.Label("Current Scale: " + thisModule.transform.root.GetComponent<RescaleSystem.RescaleableTank>().DynamicScale.ToString());
+                if (thisModule.transform.root.GetComponent<RescaleableTank>().DynamicScale != 1f)
+                    GUILayout.Label("Current Scale: " + thisModule.transform.root.GetComponent<RescaleableTank>().DynamicScale.ToString());
                 else
                     GUILayout.Label("Current Scale: Global Settings");
 
                 if (isAnchored)
-                    GUILayout.Label("Overpowered by Stronger Pip: " + thisModule.transform.root.GetComponent<RescaleSystem.RescaleableTank>().isPipLockedA);
+                    GUILayout.Label("Overpowered by Stronger Pip: " + thisModule.transform.root.GetComponent<RescaleableTank>().isPipLockedA);
                 else
-                    GUILayout.Label("Overpowered by Stronger Pip: " + thisModule.transform.root.GetComponent<RescaleSystem.RescaleableTank>().isPipLocked);
+                    GUILayout.Label("Overpowered by Stronger Pip: " + thisModule.transform.root.GetComponent<RescaleableTank>().isPipLocked);
                 
                 if (GUILayout.Button("Close"))
                 {

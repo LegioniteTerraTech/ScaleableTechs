@@ -79,7 +79,9 @@
   <ItemGroup>
     <Compile Include="GlobalScaleGUIController.cs" />
     <Compile Include="GUIPipDynamic.cs" />
-    <Compile Include="RescaleSystem.cs" />
+    <Compile Include="ModuleScaleWithSize.cs" />
+    <Compile Include="RescaleableTank.cs" />
+    <Compile Include="RescaleManager.cs" />
     <Compile Include="KickStart.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

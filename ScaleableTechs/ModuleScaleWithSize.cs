@@ -20,6 +20,7 @@ namespace ScaleableTechs
         // Variables
         public RescaleableTank rescaleableTank;
         public TankBlock TankBlock;
+        private Vector3 OGScale = Vector3.one;
         public bool secondScanFallback = false;
 
         // Player-Block-defined Variables
@@ -70,27 +71,26 @@ namespace ScaleableTechs
         public float lastScaleReceived = 1f;
         public Vector3 savedShieldScale = Vector3.zero;
         public Vector3 savedColliderScale = Vector3.zero;
-        private bool lastAttachState = true;
         private float distFromCore = 0f;        // how far we offset from ground
                                                 //private bool IsControlBlock = false;    // will rescaling cause issues
 
         public void OnPool()
         {
-            var thisInst = gameObject.GetComponent<ModuleScaleWithSize>();
+            OGScale = TankBlock.trans.localScale;
             if (IsDynamicPipParticles || gameObject.name == "_C_BLOCK:584870" || gameObject.name == "_C_BLOCK:584871")
             {
-                TankBlock.AttachEvent.Subscribe(new Action(this.OnAttach));
-                TankBlock.DetachEvent.Subscribe(new Action(this.OnDetach));
-                Debug.Log("ScaleTechs - ModuleScaleWithSize: Subscribed to Tank");
+                TankBlock.AttachEvent.Subscribe(OnAttach);
+                TankBlock.DetachEvent.Subscribe(OnDetach);
+                //Debug.Log("ScaleTechs - ModuleScaleWithSize: Subscribed to TankBlock");
             }
 
             if (gameObject.transform.GetComponent<ModuleWeaponGun>())
             {
                 try
                 {
-                    thisInst.gunCache = gameObject.GetComponent<ModuleWeaponGun>().m_ShotCooldown;
-                    thisInst.gunSFXCache = gameObject.GetComponent<ModuleWeapon>().m_ShotCooldown;
-                    //Debug.Log("ScaleTechs: Saved " + gameObject.GetComponent<ModuleWeaponGun>().m_ShotCooldown + " => " + thisInst.gunCache);
+                    gunCache = gameObject.GetComponent<ModuleWeaponGun>().m_ShotCooldown;
+                    gunSFXCache = gameObject.GetComponent<ModuleWeapon>().m_ShotCooldown;
+                    //Debug.Log("ScaleTechs: Saved " + gameObject.GetComponent<ModuleWeaponGun>().m_ShotCooldown + " => " + gunCache);
                 }
                 catch { }
             }
@@ -100,10 +100,10 @@ namespace ScaleableTechs
                 try
                 {
                     var shld = gameObject.transform.GetComponent<ModuleShieldGenerator>();
-                    thisInst.shieldCache = shld.m_Radius;
+                    shieldCache = shld.m_Radius;
                     if (shld.m_Healing == false)
                         thisHasShield = true;
-                    //Debug.Log("ScaleTechs: Saved " + shld.m_Radius + " => " + thisInst.shieldCache);
+                    //Debug.Log("ScaleTechs: Saved " + shld.m_Radius + " => " + shieldCache);
                 }
                 catch
                 {
@@ -116,11 +116,11 @@ namespace ScaleableTechs
                 try
                 {
                     var whel = gameObject.GetComponent<ModuleWheels>();
-                    thisInst.wheelSpeedCache = whel.m_TorqueParams.torqueCurveMaxRpm;
-                    thisInst.wheelSpringCache = whel.m_WheelParams.suspensionSpring;
-                    thisInst.wheelTravelCache = whel.m_WheelParams.suspensionTravel;
-                    thisInst.wheelAccelCache = whel.m_WheelParams.maxSuspensionAcceleration;
-                    thisInst.wheelRadiusCache = whel.m_WheelParams.radius;
+                    wheelSpeedCache = whel.m_TorqueParams.torqueCurveMaxRpm;
+                    wheelSpringCache = whel.m_WheelParams.suspensionSpring;
+                    wheelTravelCache = whel.m_WheelParams.suspensionTravel;
+                    wheelAccelCache = whel.m_WheelParams.maxSuspensionAcceleration;
+                    wheelRadiusCache = whel.m_WheelParams.radius;
                     //Debug.Log("ScaleTechs: Saved " + gameObject.GetComponent<ModuleScaleWithSize>().wheelSpeedCache + " | " + gameObject.GetComponent<ModuleScaleWithSize>().wheelSpringCache
                     //+ " | " + gameObject.GetComponent<ModuleScaleWithSize>().wheelTravelCache + " | "+ gameObject.GetComponent<ModuleScaleWithSize>().wheelAccelCache + " | " + gameObject.GetComponent<ModuleScaleWithSize>().wheelRadiusCache);
                     //ScaleAccordingly(1f, Vector3.one, false);
@@ -142,30 +142,13 @@ namespace ScaleableTechs
         {
             TankBlock.serializeEvent.Unsubscribe(new Action<bool, TankPreset.BlockSpec>(OnSerialize));
             TankBlock.serializeTextEvent.Unsubscribe(new Action<bool, TankPreset.BlockSpec>(OnSerialize));
-        }
-
-
-        public void Update()// Plop!
-        {
-            //Note to self - fix overscaled outcome of exploding bolts
-            //Doesn't have as bad as a performance impact as I had initially expected
-
-            if (TankBlock.IsBeingDragged && lastAttachState == true)
-            {
-                lastAttachState = false;
-                ResetScale();
-                //Set up system to recursively reposition EVERYTHING with scale
-            }
-            else
-            {
-                lastAttachState = true;
-            }
+            ResetScale();
         }
 
         public void ResetScale()
         {
             //RESET SCALES
-            gameObject.transform.localScale = Vector3.one;
+            gameObject.transform.localScale = OGScale;
         }
 
 
@@ -198,16 +181,16 @@ namespace ScaleableTechs
                 if (isBubbleShield)
                 {
                     if (gameObject.GetComponent<ModuleShieldGenerator>().IsPowered)
-                        isBubbleShield.SetTargetScale(thisInst.shieldCache * input);
+                        isBubbleShield.SetTargetScale(shieldCache * input);
                 }
 
                 if ((grabbedGameObjectCB.name == "_bubbleBulletTrigger" || grabbedGameObjectCB.name == "_bubbleTechTrigger") && grabbedGameObjectCB.gameObject.GetComponent<SphereCollider>())
                 {
                     try
                     {
-                        if (thisInst.savedColliderScale == Vector3.zero)
-                            thisInst.savedColliderScale = grabbedGameObjectCB.localScale;
-                        Vector3 toChange = thisInst.savedColliderScale;
+                        if (savedColliderScale == Vector3.zero)
+                            savedColliderScale = grabbedGameObjectCB.localScale;
+                        Vector3 toChange = savedColliderScale;
                         toChange = toChange / input;
                         grabbedGameObjectCB.localScale = toChange;
                         //Debug.Log("ScaleTechs: Updated sphereCollider size to " + toChange);
@@ -223,9 +206,9 @@ namespace ScaleableTechs
 
                     try
                     {
-                        if (thisInst.savedShieldScale == Vector3.zero)
-                            thisInst.savedShieldScale = grabbedGameObjectCB.localScale;
-                        Vector3 toChange = thisInst.savedShieldScale;
+                        if (savedShieldScale == Vector3.zero)
+                            savedShieldScale = grabbedGameObjectCB.localScale;
+                        Vector3 toChange = savedShieldScale;
                         toChange = toChange / input;
                         grabbedGameObjectCB.localScale = toChange;
                         //Debug.Log("ScaleTechs: Updated shield size to " + toChange);
@@ -245,46 +228,46 @@ namespace ScaleableTechs
 
         public void ScaleAccordingly(float scaleToAimFor, Vector3 COMTarget, bool TonyTime)
         {
-            var thisInst = gameObject.GetComponent<ModuleScaleWithSize>();
-            if (thisInst.KeepStatsRegardlessofScale == true)
+            if (KeepStatsRegardlessofScale == true)
                 return; //Make no changes beyond this point
             var isGunExists = gameObject.GetComponent<ModuleWeaponGun>();
             if (isGunExists)
             {
                 //RecursiveSearchForBulletSpawn(TankBlock.transform, scaleToAimFor);
+                /*
                 if (TonyTime)// TIME TO KILL
                 {
                     Debug.Log("ScaleTechs - ModuleScaleWithSize: TONY WRATH ENABLED");
-                    thisInst.prevTony = true;
+                    prevTony = true;
                     gameObject.GetComponent<ModuleWeapon>().m_ShotCooldown = 0.05f;
                     isGunExists.m_ShotCooldown = 0.05f;
                 }
                 else if (prevTony == true)
                 {
-                    thisInst.prevTony = false;
-                    gameObject.GetComponent<ModuleWeapon>().m_ShotCooldown = thisInst.gunSFXCache;
-                    isGunExists.m_ShotCooldown = thisInst.gunCache;
-                }
+                    prevTony = false;
+                    gameObject.GetComponent<ModuleWeapon>().m_ShotCooldown = gunSFXCache;
+                    isGunExists.m_ShotCooldown = gunCache;
+                }*/
             }
             var isWheelExists = gameObject.GetComponent<ModuleWheels>();
             if (isWheelExists)
             {
-                isWheelExists.m_TorqueParams.torqueCurveMaxRpm = thisInst.wheelSpeedCache / scaleToAimFor;
+                isWheelExists.m_TorqueParams.torqueCurveMaxRpm = wheelSpeedCache / scaleToAimFor;
                 if (wheelTravelCache >= 0.4 || scaleToAimFor >= 1.2f) //If it's smaller than 0.4 then do not bother changing it (break!)
-                    isWheelExists.m_WheelParams.suspensionTravel = Mathf.Max(thisInst.wheelTravelCache * scaleToAimFor, 0.4f);// Prevent UNDERSIZE ISSUE
+                    isWheelExists.m_WheelParams.suspensionTravel = Mathf.Max(wheelTravelCache * scaleToAimFor, 0.4f);// Prevent UNDERSIZE ISSUE
                 else
-                    isWheelExists.m_WheelParams.suspensionTravel = thisInst.wheelTravelCache;
+                    isWheelExists.m_WheelParams.suspensionTravel = wheelTravelCache;
 
-                isWheelExists.m_WheelParams.suspensionSpring = thisInst.wheelSpringCache * scaleToAimFor;
-                isWheelExists.m_WheelParams.maxSuspensionAcceleration = thisInst.wheelAccelCache * scaleToAimFor;
+                isWheelExists.m_WheelParams.suspensionSpring = wheelSpringCache * scaleToAimFor;
+                isWheelExists.m_WheelParams.maxSuspensionAcceleration = wheelAccelCache * scaleToAimFor;
 
                 if (wheelRadiusCache >= 0.4 || scaleToAimFor >= 1.2f) //If it's smaller than 0.4 then do not bother changing it (break!)
-                    isWheelExists.m_WheelParams.radius = Mathf.Max(thisInst.wheelRadiusCache * scaleToAimFor, 0.4f);// Prevent UNDERSIZE ISSUE
+                    isWheelExists.m_WheelParams.radius = Mathf.Max(wheelRadiusCache * scaleToAimFor, 0.4f);// Prevent UNDERSIZE ISSUE
                 else
-                    isWheelExists.m_WheelParams.radius = thisInst.wheelRadiusCache;
+                    isWheelExists.m_WheelParams.radius = wheelRadiusCache;
 
                 if (TonyTime)// TIME TO KILL
-                    isWheelExists.m_TorqueParams.torqueCurveMaxRpm = thisInst.wheelSpeedCache / 1.5f;
+                    isWheelExists.m_TorqueParams.torqueCurveMaxRpm = wheelSpeedCache / 1.5f;
                 UpdateFreakingWheels.ForceUpdateWHEELS(TankBlock.gameObject);
             }
             var isBubbleExists = gameObject.GetComponent<ModuleShieldGenerator>();
@@ -442,7 +425,6 @@ namespace ScaleableTechs
         {
             try
             {
-                TankBlock.transform.root.GetComponent<RescaleableTank>().lastExternalRequestState = true;
                 if (MustBeAnchored)
                     TankBlock.transform.root.GetComponent<RescaleableTank>().DynamicScaleA = SavedScale;
                 else
