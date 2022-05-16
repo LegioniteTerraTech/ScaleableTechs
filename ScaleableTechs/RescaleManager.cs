@@ -57,6 +57,12 @@ namespace ScaleableTechs
             var resTank = tech.GetComponent<RescaleableTank>();
             AddToQueue(resTank);
         }
+        public static void QueueUpdater(Tank tech, TrackedVisible TV)
+        {
+            var resTank = tech.GetComponent<RescaleableTank>();
+            AddToQueue(resTank);
+        }
+
         public static void QueueUpdater(Tank tech, ManTechs.TeamChangeInfo info)
         {
             QueueUpdater(tech);
