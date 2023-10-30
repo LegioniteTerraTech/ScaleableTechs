@@ -4,7 +4,7 @@ using System.Linq;
 using System.Reflection;
 using UnityEngine;
 using HarmonyLib;
-using ModHelper.Config;
+using ModHelper;
 using Nuterra.NativeOptions;
 
 namespace ScaleableTechs
@@ -16,10 +16,14 @@ namespace ScaleableTechs
     public class KickStart
     {
         //
-        const string ModName = "ScaleTechs";
+        public const string ModName = "ScaleTechs";
 
-        //Make a Config File to store user preferences
-        public static ModConfig _thisModConfig;
+        internal static bool launched = false;
+        internal static bool isConfigHelperPresent = false;
+        internal static bool isNativeOptionsPresent = false;
+
+        public static int keyInt = 91;  //default to be [
+        public static KeyCode hotKey;
 
         //Variables
         public static bool GlobalGUIActive = false;     // Is the display up
@@ -37,18 +41,6 @@ namespace ScaleableTechs
 
         public static bool isBuffBlocksPresent = false;
 
-        public static int keyInt = 91;  //default to be [
-
-        // NativeOptions Parameters
-        public static KeyCode hotKey;
-        public static OptionKey GUIMenuHotKey;
-        public static OptionToggle resetPlayerScaleWhenBuilding;
-        public static OptionToggle randomEnemyScale;
-        public static OptionRange allTechsScale;
-        public static OptionToggle noPreventLogsplosion;
-        public static OptionToggle unInstall;
-
-
         public static void Main()
         {
             //Where the fun begins
@@ -65,7 +57,7 @@ namespace ScaleableTechs
                 Debug.Log("ScaleTechs: WARNING: FAILIURE TO SUPPRESS \"BoundsIntersectSphere\"!");
                 Debug.Log(e);
             }
-            RescaleManager.Initiate();
+            ManTankRescaler.Initiate();
             GlobalScaleGUIController.Initiate();
 
             //Make the Localized Pip GUI
@@ -74,39 +66,60 @@ namespace ScaleableTechs
             GamerObject.AddComponent<GUIPipDynamic>();
             Debug.Log("ScaleTechs - LocalGUI: Now Exists");
 
-            Debug.Log("\nScaleTechs: Config Loading...");
-            ModConfig thisModConfig = new ModConfig();
-            Debug.Log("ScaleTechs: Config Loaded.");
 
-            thisModConfig.BindConfig<KickStart>(null, "keyInt");
-            hotKey = (KeyCode)keyInt;
-            thisModConfig.BindConfig<KickStart>(null, "dontPreventLogSpam");
-            thisModConfig.BindConfig<KickStart>(null, "RandomEnemyScales");
-            thisModConfig.BindConfig<KickStart>(null, "ResetPlayerScale");
-            thisModConfig.BindConfig<KickStart>(null, "GlobalAimedScale");
-            thisModConfig.BindConfig<KickStart>(null, "unInstallTrue");
-            _thisModConfig = thisModConfig;
-
-
-            //NativeOptions
-            var TechScaleProperties = ModName + " - Tech Scale Settings";
-            GUIMenuHotKey = new OptionKey("GUI Menu Button", TechScaleProperties, hotKey);
-            GUIMenuHotKey.onValueSaved.AddListener(() => { keyInt = (int)(hotKey = GUIMenuHotKey.SavedValue); GlobalScaleGUIController.Save(); });
-
-            noPreventLogsplosion = new OptionToggle("Enable All Techs Rescaling", TechScaleProperties, dontPreventLogSpam);
-            noPreventLogsplosion.onValueSaved.AddListener(() => { dontPreventLogSpam = noPreventLogsplosion.SavedValue; RescaleManager.UpdateAll(); GlobalScaleGUIController.Save(); });
-            randomEnemyScale = new OptionToggle("Random Enemy Scaling", TechScaleProperties, RandomEnemyScales);
-            randomEnemyScale.onValueSaved.AddListener(() => { RandomEnemyScales = randomEnemyScale.SavedValue; RescaleManager.UpdateAllEnemies(); GlobalScaleGUIController.Save(); });
-
-            resetPlayerScaleWhenBuilding = new OptionToggle("Scale to 1 in Build Beam", TechScaleProperties, ResetPlayerScale);
-            resetPlayerScaleWhenBuilding.onValueSaved.AddListener(() => { ResetPlayerScale = resetPlayerScaleWhenBuilding.SavedValue; GlobalScaleGUIController.Save(); });
-
-            allTechsScale = new OptionRange("Global Tech Scale", TechScaleProperties, GlobalAimedScale, 0.5f, 2.0f, 0.1f);
-            allTechsScale.onValueSaved.AddListener(() => { GlobalAimedScale = allTechsScale.SavedValue; GlobalScaleGUIController.Save(); });
-            unInstall = new OptionToggle("\n<b>Prepare for Uninstall</b>  \n(Toggle this OFF and Save your Techs & Worlds to keep!)", TechScaleProperties, unInstallTrue);
-            unInstall.onValueSaved.AddListener(() => { unInstallTrue = unInstall.SavedValue; RescaleManager.UpdateAll(); GlobalScaleGUIController.Save(); });
+            InitSettings();
         }
+        public static void InitSettings()
+        {
+            if (launched)
+                return;
+            launched = true;
+            if (isNativeOptionsPresent && isConfigHelperPresent)
+            {
+                try
+                {
+                    KickStartConfigHelper.PushExtModConfigHandling();
+                }
+                catch (Exception e)
+                {
+                    Debug.Log("ScaleTechs: Error on Option & Config setup");
+                    Debug.Log(e);
+                }
+            }
+            else if (isNativeOptionsPresent)
+            {
+                try
+                {
+                    KickStartNativeOptions.PushExtModOptionsHandling();
+                }
+                catch (Exception e)
+                {
+                    Debug.Log("ScaleTechs: Error on NativeOptions setup");
+                    Debug.Log(e);
+                }
+            }
+            else if (isConfigHelperPresent)
+            {
+                try
+                {
+                    KickStartConfigHelper.PushExtModConfigHandlingConfigOnly();
+                }
+                catch (Exception e)
+                {
+                    Debug.Log("ScaleTechs: Error on ConfigHelper setup");
+                    Debug.Log(e);
+                }
+            }
 
+        }
+        public static void TrySaveConfig()
+        {
+            try
+            {
+
+            }
+            catch { }
+        }
         public static bool LookForMod(string name)
         {
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
@@ -120,6 +133,86 @@ namespace ScaleableTechs
         }
     }
 
+    public class KickStartConfigHelper
+    {
+        internal static void PushExtModConfigHandlingConfigOnly()
+        {
+            PushExtModConfigSetup();
+        }
+        internal static ModConfig PushExtModConfigSetup()
+        {
+            Debug.Log("\nScaleTechs: Config Loading...");
+            ModConfig thisModConfig = new ModConfig();
+            Debug.Log("ScaleTechs: Config Loaded.");
+
+            thisModConfig.BindConfig<KickStart>(null, "keyInt");
+            KickStart.hotKey = (KeyCode)KickStart.keyInt;
+            thisModConfig.BindConfig<KickStart>(null, "dontPreventLogSpam");
+            thisModConfig.BindConfig<KickStart>(null, "RandomEnemyScales");
+            thisModConfig.BindConfig<KickStart>(null, "ResetPlayerScale");
+            thisModConfig.BindConfig<KickStart>(null, "GlobalAimedScale");
+            thisModConfig.BindConfig<KickStart>(null, "unInstallTrue");
+            return thisModConfig;
+        }
+        internal static void PushExtModConfigHandling()
+        {
+            var thisModConfig = PushExtModConfigSetup();
+            try
+            {
+                KickStartNativeOptions.PushExtModOptionsHandling(thisModConfig);
+            }
+            catch (Exception e)
+            {
+                throw new Exception("PushExtModOptionsHandling within PushExtModConfigHandling hit exception - ", e);
+            }
+        }
+    }
+
+    public class KickStartNativeOptions
+    {
+        public static string ModName => KickStart.ModName;
+
+        // NativeOptions Parameters
+        public static OptionKey GUIMenuHotKey;
+        public static OptionToggle resetPlayerScaleWhenBuilding;
+        public static OptionToggle randomEnemyScale;
+        public static OptionRange allTechsScale;
+        public static OptionToggle noPreventLogsplosion;
+        public static OptionToggle unInstall;
+
+
+
+        internal static void PushExtModOptionsHandling()
+        {
+            //NativeOptions
+            var TechScaleProperties = ModName + " - Tech Scale Settings";
+            GUIMenuHotKey = new OptionKey("GUI Menu Button", TechScaleProperties, KickStart.hotKey);
+            GUIMenuHotKey.onValueSaved.AddListener(() => { KickStart.keyInt = (int)(KickStart.hotKey = GUIMenuHotKey.SavedValue); GlobalScaleGUIController.Save(); });
+
+            noPreventLogsplosion = new OptionToggle("Enable All Techs Rescaling", TechScaleProperties, KickStart.dontPreventLogSpam);
+            noPreventLogsplosion.onValueSaved.AddListener(() => { KickStart.dontPreventLogSpam = noPreventLogsplosion.SavedValue; ManTankRescaler.UpdateAll(); GlobalScaleGUIController.Save(); });
+            randomEnemyScale = new OptionToggle("Random Enemy Scaling", TechScaleProperties, KickStart.RandomEnemyScales);
+            randomEnemyScale.onValueSaved.AddListener(() => { KickStart.RandomEnemyScales = randomEnemyScale.SavedValue; ManTankRescaler.UpdateAllEnemies(); GlobalScaleGUIController.Save(); });
+
+            resetPlayerScaleWhenBuilding = new OptionToggle("Scale to 1 in Build Beam", TechScaleProperties, KickStart.ResetPlayerScale);
+            resetPlayerScaleWhenBuilding.onValueSaved.AddListener(() => { KickStart.ResetPlayerScale = resetPlayerScaleWhenBuilding.SavedValue; GlobalScaleGUIController.Save(); });
+
+            allTechsScale = new OptionRange("Global Tech Scale", TechScaleProperties, KickStart.GlobalAimedScale, 0.5f, 2.0f, 0.1f);
+            allTechsScale.onValueSaved.AddListener(() => { 
+                KickStart.GlobalAimedScale = allTechsScale.SavedValue; 
+                GlobalScaleGUIController.Save(); 
+            });
+            unInstall = new OptionToggle("\n<b>Prepare for Uninstall</b>  \n(Toggle this OFF and Save your Techs & Worlds to keep!)", TechScaleProperties, KickStart.unInstallTrue);
+            unInstall.onValueSaved.AddListener(() => { KickStart.unInstallTrue = unInstall.SavedValue; ManTankRescaler.UpdateAll(); GlobalScaleGUIController.Save(); });
+        }
+
+        internal static void PushExtModOptionsHandling(ModConfig thisModConfig)
+        {
+            PushExtModOptionsHandling();
+            if (thisModConfig != null)
+                NativeOptionsMod.onOptionsSaved.AddListener(() => { thisModConfig.WriteConfigJsonFile(); });
+        }
+    }
     internal class Patches
     {
         //SHOVE IN ModuleRescale in EVERYTHING!

@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace ScaleableTechs
 {
-    public class RescaleManager : MonoBehaviour
+    public class ManTankRescaler : MonoBehaviour
     {
         /// <summary>
         ///   Probably the BIGGEST of messes out there, the Rescalesystem is home to a fairly quirky thingamabob
@@ -20,7 +20,8 @@ namespace ScaleableTechs
         //public static bool PreventLogSpam = false;        // Disable non-player-controlled-Tech to disable log spamming
 
         //World Variables
-        public static RescaleManager inst;
+        public static ManTankRescaler inst;
+        public static List<RescaleableTank> scalers = new List<RescaleableTank>();
 
         public static bool LastPlayerBeamState = false; 
         public static bool CriticalError = false;           // IS A CRASH LIKELY
@@ -34,7 +35,7 @@ namespace ScaleableTechs
 
         public static void Initiate()
         {
-            inst = new GameObject("RescaleManager").AddComponent<RescaleManager>();
+            inst = new GameObject("RescaleManager").AddComponent<ManTankRescaler>();
             Singleton.Manager<ManTechs>.inst.TankNameChangedEvent.Subscribe(QueueUpdater);
             Singleton.Manager<ManTechs>.inst.TankTeamChangedEvent.Subscribe(QueueUpdater);
             Singleton.Manager<ManTechs>.inst.TankPostSpawnEvent.Subscribe(QueueUpdater);
@@ -88,15 +89,21 @@ namespace ScaleableTechs
             }
         }
 
+        public static void ReloadAll()
+        {
+            foreach (var tech in scalers)
+            {
+                AddToQueue(tech);
+            }
+        }
         public static void FetchAllNeedsUpdate()
         {
-            foreach (Tank tech in Singleton.Manager<ManTechs>.inst.CurrentTechs)
+            foreach (var tech in scalers)
             {
-                var resTank = tech.GetComponent<RescaleableTank>();
-                if (resTank)
+                if (tech)
                 {
-                    if (resTank.GetNeedsUpdate() || resTank.NeedsUpdate)
-                        AddToQueue(resTank);
+                    if (tech.GetNeedsUpdate() || tech.NeedsUpdate)
+                        AddToQueue(tech);
                 }
             }
         }

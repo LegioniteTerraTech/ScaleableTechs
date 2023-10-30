@@ -79,8 +79,8 @@ namespace ScaleableTechs
             OGScale = TankBlock.trans.localScale;
             if (IsDynamicPipParticles || gameObject.name == "_C_BLOCK:584870" || gameObject.name == "_C_BLOCK:584871")
             {
-                TankBlock.AttachEvent.Subscribe(OnAttach);
-                TankBlock.DetachEvent.Subscribe(OnDetach);
+                TankBlock.AttachingEvent.Subscribe(OnAttach);
+                TankBlock.DetachedEvent.Subscribe(OnDetach);
                 //Debug.Log("ScaleTechs - ModuleScaleWithSize: Subscribed to TankBlock");
             }
 
@@ -136,12 +136,12 @@ namespace ScaleableTechs
         public void OnAttach()
         {
             TankBlock.serializeEvent.Subscribe(new Action<bool, TankPreset.BlockSpec>(OnSerialize));
-            TankBlock.serializeTextEvent.Subscribe(new Action<bool, TankPreset.BlockSpec>(OnSerialize));
+            //TankBlock.serializeTextEvent.Subscribe(new Action<bool, TankPreset.BlockSpec>(OnSerialize));
         }
         public void OnDetach()
         {
             TankBlock.serializeEvent.Unsubscribe(new Action<bool, TankPreset.BlockSpec>(OnSerialize));
-            TankBlock.serializeTextEvent.Unsubscribe(new Action<bool, TankPreset.BlockSpec>(OnSerialize));
+            //TankBlock.serializeTextEvent.Unsubscribe(new Action<bool, TankPreset.BlockSpec>(OnSerialize));
             ResetScale();
         }
 

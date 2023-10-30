@@ -12,8 +12,13 @@ namespace ScaleableTechs
     {
         //Attach this to sync all collider removals on a Tech
         public Tank tank;
+        private List<ModuleScaleWithSize> AllScaleMods = new List<ModuleScaleWithSize>();
 
         public bool NeedsUpdate = false;
+        public void StartUpdating()
+        {
+            
+        }
 
         public bool isThisTony = false;
 
@@ -66,20 +71,34 @@ namespace ScaleableTechs
             //tank.AnchorEvent.Subscribe(OnAnchor);
             //tank.PostSpawnEvent.Subscribe(OnSpawn);
             tank.TankRecycledEvent.Subscribe(OnRecycle);
+            ManTankRescaler.scalers.Add(this);
         }
         public void OnAttach(TankBlock tankblock, Tank tank)
         {
             if (tank == this.tank)
             {
-                tankblock.GetComponent<ModuleScaleWithSize>().rescaleableTank = this;
-                UpdateAllModuleScaleWithSize(true);
+                var scalerMod = tankblock.GetComponent<ModuleScaleWithSize>();
+                if (scalerMod)
+                {
+                    AllScaleMods.Add(scalerMod);
+                    scalerMod.rescaleableTank = this;
+                    UpdateAllModuleScaleWithSize(true);
+                    StartUpdating();
+                }
             }
         }
         public void OnDetach(TankBlock tankblock, Tank tank)
         {
             if (tank == this.tank)
             {
-                tankblock.GetComponent<ModuleScaleWithSize>().rescaleableTank = null;
+                var scalerMod = tankblock.GetComponent<ModuleScaleWithSize>();
+                if (scalerMod)
+                {
+                    scalerMod.rescaleableTank = null;
+                    UpdateAllModuleScaleWithSize(true);
+                    StartUpdating();
+                    AllScaleMods.Remove(scalerMod);
+                }
             }
         }
         public void OnAnchor(ModuleAnchor moduleAnchor, bool unUsed, bool unUsed2)
@@ -87,11 +106,13 @@ namespace ScaleableTechs
             var ThisInst = tank.GetComponent<RescaleableTank>();
             lastAnchorState = true;
             //Debug.Log("AnchorUpdate");
+            StartUpdating();
         }
-        public void OnSpawn()
-        {   //RESET ALL 
+
+        public void ResetAll()
+        {   //RESET ALL
             RescaleEntireTech();
-            
+
             AimedScale = 1f;
             HasPip = false;
             isPipDynamic = false;
@@ -108,8 +129,9 @@ namespace ScaleableTechs
             ControlBlockBotched = false;
         }
         public void OnRecycle(Tank tank)
-        {   //RESET ALL
-            OnSpawn();
+        {
+            ResetAll();
+            tank.TankRecycledEvent.Unsubscribe(OnRecycle);
             //Debug.Log("OnRecycle - " + tank.name);
         }
 
@@ -118,7 +140,7 @@ namespace ScaleableTechs
             //if (KickStart.AttemptRecovery == false)
             //    RescaleEntireTech(1f);//GET BACK TO NORMAL ASAP
             ControlBlockBotched = true;
-            RescaleManager.CriticalError = true;
+            ManTankRescaler.CriticalError = true;
         }
 
         public void PipReceived(float valueIn, bool isDynamic, bool isStrong, bool isAnchored, float newMin, float newMax)
@@ -236,7 +258,7 @@ namespace ScaleableTechs
 
         public void RequestUpdate()
         {
-            RescaleManager.QueueUpdater(tank);
+            ManTankRescaler.QueueUpdater(tank);
         }
         public bool GetNeedsUpdate()
         {
@@ -312,11 +334,11 @@ namespace ScaleableTechs
                 {
                     RescaleEntireTech(1f);
                     AimedScale = 1f;
-                    if (RescaleManager.ControlBlockWarningIssued == false)
+                    if (ManTankRescaler.ControlBlockWarningIssued == false)
                     {
                         UpdateAllModuleScaleWithSize(true);
-                        RescaleManager.CriticalError = true;
-                        RescaleManager.ControlBlockWarningIssued = true;
+                        ManTankRescaler.CriticalError = true;
+                        ManTankRescaler.ControlBlockWarningIssued = true;
                         Debug.Log("\n-------------------------------------------------------------------------------");
                         Debug.Log("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
                         Debug.Log("|!| ScaleTechs: LOCKDOWN ON " + tank.name + " AS IT CONTAINS CONTROL BLOCKS |!|");
@@ -467,7 +489,7 @@ namespace ScaleableTechs
                     {
                         tank.FixupAnchors();
                         if (!tank.IsAnchored)
-                            tank.TryToggleTechAnchor();
+                            tank.TrySetAnchored(true);
                     }
                 }
             }

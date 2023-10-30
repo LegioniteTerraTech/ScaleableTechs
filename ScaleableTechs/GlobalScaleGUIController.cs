@@ -19,7 +19,7 @@ namespace ScaleableTechs
             KickStart.GlobalAimedScale = GUI.HorizontalSlider(new Rect(20, 80, 160, 15), Mathf.Round(KickStart.GlobalAimedScale * 10) / 10, 0.5f, 2.0f);
             int sizeMatters = (int)(KickStart.GlobalAimedScale * 100);
             GUI.Label(new Rect(20, 60, 160, 20), "GLOBAL TECH SIZE: " + sizeMatters + "%");
-            if (RescaleManager.CriticalError == true)
+            if (ManTankRescaler.CriticalError == true)
             {
                 GUI.Label(new Rect(20, 30, 330, 20), "The Mod \"Control Blocks\" is unsupported!");
                 GUI.Label(new Rect(20, 45, 330, 20), "   ������                                          ATTEMPT RECOVERY");
@@ -35,7 +35,7 @@ namespace ScaleableTechs
                     GUI.Label(new Rect(20, 45, 160, 20), "Affects ALL Techs");
             }
             if (prevScale != KickStart.GlobalAimedScale)
-                RescaleManager.FetchAllNeedsUpdate();
+                ManTankRescaler.FetchAllNeedsUpdate();
             GUI.DragWindow();
         }
 
@@ -47,8 +47,8 @@ namespace ScaleableTechs
                 GUIWindow.SetActive(GUIIsActive);
                 if (!GUIIsActive)
                 {
-                    Debug.Log("\nScaleTech - GlobalGUI: Writing to Config...");
-                    KickStart._thisModConfig.WriteConfigJsonFile();
+                    //Debug.Log("\nScaleTech - GlobalGUI: Writing to Config...");
+                    //KickStart._thisModConfig.WriteConfigJsonFile();
                 }
             }
         }
@@ -57,8 +57,8 @@ namespace ScaleableTechs
         {
             if (!isSaving)
             {
-                Debug.Log("\nScaleTechs: Writing to Config...");
-                KickStart._thisModConfig.WriteConfigJsonFile();
+                //Debug.Log("\nScaleTechs: Writing to Config...");
+                //KickStart._thisModConfig.WriteConfigJsonFile();
                 isSaving = true;
             }
         }
@@ -74,7 +74,7 @@ namespace ScaleableTechs
         {
             private void OnGUI()
             {
-                if (RescaleManager.CriticalError == true && GUIIsActive)
+                if (ManTankRescaler.CriticalError == true && GUIIsActive)
                 {
                     BlockWindow2 = GUI.Window(1337, BlockWindow2, GUIHandler, "ScaleTech Has Encountered a Serious Error!");
                 }
